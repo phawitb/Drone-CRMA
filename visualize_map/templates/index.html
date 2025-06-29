@@ -69,17 +69,14 @@
       color: #333;
       font-weight: bold;
     }
-
     .placeholder {
       color: gray;
       font-style: italic;
     }
-
     .normal {
       color: black;
       font-style: normal;
     }
-
   </style>
 </head>
 <body>
@@ -98,9 +95,7 @@
       </div>
       <div id="flightContainer">
         <button id="startFlightBtn" onclick="toggleFlight()">🚀 Start Flight</button>
-        <!-- <span id="flightStatus">Status: Not Ready</span> -->
         <span id="flightStatus" style="color: red;">Status: Not Ready</span>
-
         <a id="historyBtn" href="/history">📂 View History</a>
       </div>
     </div>
@@ -110,10 +105,8 @@
     const streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© OpenStreetMap contributors'
     });
-
     const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-      attribution: '© Esri & NASA',
-      maxZoom: 19
+      attribution: '© Esri & NASA', maxZoom: 19
     });
 
     const map = L.map('map', {
@@ -184,7 +177,6 @@
       if (!data.ready) return;
 
       const latlng = [data.lat, data.lon];
-
       if (!firstDroneGPSReceived) {
         map.setView(latlng, 17);
         firstDroneGPSReceived = true;
@@ -197,17 +189,13 @@
         const lastIdx = dronePath.length - 1;
         const color = getRainbowColor(lastIdx / 100);
         const segment = L.polyline([dronePath[lastIdx - 1], dronePath[lastIdx]], {
-          color: color,
-          weight: 4
+          color: color, weight: 4
         }).addTo(map);
         droneSegments.push(segment);
       }
 
       const dot = L.circleMarker(latlng, {
-        radius: 4,
-        color: 'red',
-        fillColor: 'red',
-        fillOpacity: 1
+        radius: 4, color: 'red', fillColor: 'red', fillOpacity: 1
       }).addTo(map);
 
       dot.on('click', () => {
@@ -223,7 +211,6 @@
       });
 
       dronePoints.push(dot);
-
       if (droneMarker) {
         droneMarker.setLatLng(latlng);
       } else {
@@ -242,8 +229,8 @@
         const key = `${obj.lat.toFixed(6)},${obj.lon.toFixed(6)}`;
         const isSelected = (key === selectedObjectKey);
         const icon = isSelected ? getLargerIcon(obj.class) : getIcon(obj.class);
-
         const marker = L.marker([obj.lat, obj.lon], { icon }).addTo(map);
+
         marker.on('click', () => {
           selectedObjectKey = key;
           showObjectDetails(obj);
@@ -255,7 +242,7 @@
 
     function showDroneDetails(data) {
       const box = document.getElementById('droneBox');
-      box.className = "normal";  // ← แก้ class
+      box.className = "normal";
       box.innerHTML = `
         <div class="value"><b>Lat:</b> ${data.lat.toFixed(6)}</div>
         <div class="value"><b>Lon:</b> ${data.lon.toFixed(6)}</div>
@@ -264,10 +251,9 @@
       `;
     }
 
-
     function showObjectDetails(obj) {
       const box = document.getElementById('infoBox');
-      box.className = "normal";  // ← แก้ class
+      box.className = "normal";
       box.innerHTML = `
         <div class="value"><b>Class:</b> ${obj.class}</div>
         <div class="value"><b>Lat:</b> ${obj.lat.toFixed(6)}</div>
@@ -284,7 +270,6 @@
         img.src = '';
       }
     }
-
 
     function getIcon(className) {
       return new L.Icon({
@@ -317,13 +302,27 @@
       setTimeout(updateAll, 1000);
     }
 
-    updateAll();
+    async function checkFlightStatus() {
+      const res = await fetch('/api/status');
+      const data = await res.json();
+      flightActive = data.ready;
 
-    // ✅ Ensure history button shows on initial load if flight not started
-    window.onload = () => {
-      if (!flightActive) {
+      if (flightActive) {
+        document.getElementById('flightStatus').innerText = 'Status: Ready ✅';
+        document.getElementById('flightStatus').style.color = 'green';
+        document.getElementById('startFlightBtn').innerText = '🛬 Finish Flight';
+        document.getElementById('historyBtn').style.display = 'none';
+      } else {
+        document.getElementById('flightStatus').innerText = 'Status: Not Ready';
+        document.getElementById('flightStatus').style.color = 'red';
+        document.getElementById('startFlightBtn').innerText = '🚀 Start Flight';
         document.getElementById('historyBtn').style.display = 'block';
       }
+    }
+
+    window.onload = async () => {
+      await checkFlightStatus();
+      updateAll();
     };
   </script>
 </body>

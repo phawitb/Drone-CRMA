@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify, render_template, send_from_directory
 import os, csv, base64
 from datetime import datetime
-# from flask import send_from_directory
+
 app = Flask(__name__, static_url_path='/static')
 
 # === STEP 1: Create next flight directory ===
@@ -49,6 +49,10 @@ def start_flight():
     IMG_DIR = os.path.join(FLIGHT_DIR, "images")
     print(f"🚀 New flight started: {FLIGHT_DIR}")
     return jsonify({'status': 'Flight started', 'ready': flight_ready})
+
+@app.route('/api/status')
+def get_status():
+    return jsonify({'ready': flight_ready})
 
 @app.route('/api/send', methods=['POST'])
 def send_data():
@@ -103,7 +107,6 @@ def add_object():
     objects.append(obj)
 
     try:
-        os.makedirs(os.path.dirname(OBJECT_LOG_PATH), exist_ok=True)
         with open(OBJECT_LOG_PATH, 'a', newline='') as f:
             writer = csv.writer(f)
             writer.writerow([data['timestamp'], data['class'], data['lat'], data['lon']])
@@ -146,10 +149,19 @@ def history():
     if not os.path.exists("logs"):
         return render_template('history.html', flights=[])
 
-    flight_dirs = sorted([
-        d for d in os.listdir("logs") 
-        if d.startswith("flight") and os.path.isdir(os.path.join("logs", d))
-    ])
+    # flight_dirs = sorted([
+    #     d for d in os.listdir("logs") 
+    #     if d.startswith("flight") and os.path.isdir(os.path.join("logs", d))
+    # ])
+
+    flight_dirs = sorted(
+        [
+            d for d in os.listdir("logs")
+            if d.startswith("flight") and os.path.isdir(os.path.join("logs", d))
+        ],
+        key=lambda x: int(x.replace("flight", ""))
+    )
+
 
     flights_data = []
 
@@ -196,7 +208,6 @@ def history():
         })
 
     return render_template('history.html', flights=flights_data)
-
 
 @app.route('/logs/<path:filename>')
 def serve_logs(filename):

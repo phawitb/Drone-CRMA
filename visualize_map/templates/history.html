@@ -76,33 +76,33 @@
   {% if flights %}
   <script>
     const flights = {{ flights | tojson }};
-
     const streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© OpenStreetMap contributors'
     });
-
     const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-      attribution: '© Esri & NASA',
-      maxZoom: 19
+      attribution: '© Esri & NASA', maxZoom: 19
     });
-
+  
     const map = L.map('map', {
       center: [13.7367, 100.5231],
       zoom: 13,
       layers: [streetLayer]
     });
-
+  
     L.control.layers({
       "🗺️ Street": streetLayer,
       "🛰️ Satellite": satelliteLayer
     }).addTo(map);
-
+  
     let droneSegments = [];
     let startMarker = null;
     let endMarker = null;
     let objectMarkers = [];
     let dronePointMarkers = [];
-
+  
+    let selectedMarker = null;
+    let selectedMarkerType = null;
+  
     function getIcon(className) {
       return new L.Icon({
         iconUrl: `/static/icons/${className}.png`,
@@ -111,18 +111,28 @@
         popupAnchor: [0, -10]
       });
     }
-
+  
+    function getLargerIcon(className) {
+      return new L.Icon({
+        iconUrl: `/static/icons/${className}.png`,
+        iconSize: [50, 50],
+        iconAnchor: [25, 25],
+        popupAnchor: [0, -10]
+      });
+    }
+  
     function getRainbowColor(t) {
       const r = Math.floor(255 * Math.sin(Math.PI * t));
       const g = Math.floor(255 * Math.sin(Math.PI * (t + 0.33)));
       const b = Math.floor(255 * Math.sin(Math.PI * (t + 0.66)));
       return `rgb(${r}, ${g}, ${b})`;
     }
-
+  
     function updateFlight() {
       const idx = document.getElementById('flightSelect').value;
       const flight = flights[idx];
-
+  
+      // Clear previous layers
       droneSegments.forEach(seg => map.removeLayer(seg));
       droneSegments = [];
       if (startMarker) map.removeLayer(startMarker);
@@ -131,15 +141,17 @@
       objectMarkers = [];
       dronePointMarkers.forEach(m => map.removeLayer(m));
       dronePointMarkers = [];
-
+  
+      selectedMarker = null;
+  
+      // Draw drone path
       const latlngs = flight.path.map(p => [p.lat, p.lon]);
       if (latlngs.length > 1) {
         const total = latlngs.length - 1;
         for (let i = 0; i < total; i++) {
           const color = getRainbowColor(i / total);
           const seg = L.polyline([latlngs[i], latlngs[i + 1]], {
-            color: color,
-            weight: 4
+            color: color, weight: 4
           }).addTo(map);
           droneSegments.push(seg);
         }
@@ -147,16 +159,25 @@
         endMarker = L.marker(latlngs[latlngs.length - 1], { title: "End" }).addTo(map);
         map.fitBounds(L.latLngBounds(latlngs));
       }
-
-      flight.path.forEach((pt) => {
+  
+      // Drone point markers
+      flight.path.forEach((pt, i) => {
         const marker = L.circleMarker([pt.lat, pt.lon], {
           radius: 4,
           color: 'red',
           fillColor: 'red',
           fillOpacity: 1
         }).addTo(map);
-
+  
+        marker.originalRadius = 4;
+  
         marker.on('click', () => {
+          resetPreviousMarker();
+  
+          marker.setStyle({ radius: 10 });
+          selectedMarker = marker;
+          selectedMarkerType = 'drone';
+  
           document.getElementById('infoBox').innerHTML = `
             <b>🛰️ Drone Point</b><br>
             <b>Lat:</b> ${pt.lat.toFixed(6)}<br>
@@ -167,14 +188,24 @@
           document.getElementById('objectImage').style.display = "none";
           document.getElementById('objectImage').src = "";
         });
-
+  
         dronePointMarkers.push(marker);
       });
-
+  
+      // Object markers
       flight.objects.forEach(obj => {
         const icon = getIcon(obj.class);
         const marker = L.marker([obj.lat, obj.lon], { icon }).addTo(map);
+  
         marker.on('click', () => {
+          resetPreviousMarker();
+  
+          const largeIcon = getLargerIcon(obj.class);
+          marker.setIcon(largeIcon);
+          selectedMarker = marker;
+          selectedMarkerType = 'object';
+          selectedMarker.originalIcon = icon;
+  
           document.getElementById('infoBox').innerHTML = `
             <b>🧍 Object</b><br>
             <b>Class:</b> ${obj.class}<br>
@@ -182,6 +213,7 @@
             <b>Lon:</b> ${obj.lon.toFixed(6)}<br>
             <b>Time:</b> ${obj.timestamp}
           `;
+  
           if (obj.image_url) {
             document.getElementById('objectImage').src = obj.image_url;
             document.getElementById('objectImage').style.display = "block";
@@ -190,12 +222,24 @@
             document.getElementById('objectImage').src = "";
           }
         });
+  
         objectMarkers.push(marker);
       });
     }
-
+  
+    function resetPreviousMarker() {
+      if (selectedMarker && selectedMarkerType === 'drone') {
+        selectedMarker.setStyle({ radius: selectedMarker.originalRadius });
+      } else if (selectedMarker && selectedMarkerType === 'object') {
+        selectedMarker.setIcon(selectedMarker.originalIcon);
+      }
+      selectedMarker = null;
+      selectedMarkerType = null;
+    }
+  
     updateFlight();
   </script>
+  
   {% endif %}
 
 </body>
